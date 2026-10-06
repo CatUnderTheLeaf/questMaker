@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local configuration files
+.vscode/settings.json
+.python-version
+*.lock
