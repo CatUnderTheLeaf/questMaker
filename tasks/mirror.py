@@ -5,13 +5,14 @@ import random
 from PIL import Image
 
 from tasks import register_task
-from lib.render import render_text
+from lib.render import render_text, with_instruction
 
 _FLIPS = (Image.Transpose.FLIP_LEFT_RIGHT, Image.Transpose.FLIP_TOP_BOTTOM)
 
 
 @register_task(
     name="Mirror",
+    type="text",
     description=(
         "The clue-word is flipped at random, either horizontally or "
         "vertically, never both at once. The participant needs a mirror to "
@@ -29,5 +30,9 @@ _FLIPS = (Image.Transpose.FLIP_LEFT_RIGHT, Image.Transpose.FLIP_TOP_BOTTOM)
     no_spaces=True,
 )
 def mirror(word: str) -> Image.Image:
-    img = render_text(word.strip(), uppercase=True)
-    return img.transpose(random.choice(_FLIPS))
+    content = render_text(word.strip(), uppercase=True).transpose(
+        random.choice(_FLIPS)
+    )
+    return with_instruction(
+        content, "Don't believe your eyes. What word is it really?"
+    )

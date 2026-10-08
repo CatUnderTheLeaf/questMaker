@@ -3,11 +3,12 @@
 from PIL import Image
 
 from tasks import register_task
-from lib.render import render_text
+from lib.render import render_text, with_instruction
 
 
 @register_task(
     name="Reverse word",
+    type="text",
     description=(
         "A simple task: the clue-word is written backwards. The participant "
         "needs to read confidently and reverse the letter order to recover "
@@ -22,4 +23,5 @@ from lib.render import render_text
     min_len=3,
 )
 def reverse_word(word: str) -> Image.Image:
-    return render_text(word.strip()[::-1], uppercase=True)
+    content = render_text(word.strip()[::-1], uppercase=True)
+    return with_instruction(content, "Can you spot the secret word?")

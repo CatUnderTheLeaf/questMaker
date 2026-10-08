@@ -5,7 +5,7 @@ import random
 from PIL import Image
 
 from tasks import UnsuitableWord, register_task
-from lib.render import render_text
+from lib.render import render_text, with_instruction
 
 _RUSSIAN_ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
 _ENGLISH_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -13,6 +13,7 @@ _ENGLISH_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 @register_task(
     name="Extra letters",
+    type="text",
     description=(
         "A random letter that is not part of the clue-word is inserted in "
         "random places, up to as many times as the word is long. All letters "
@@ -57,4 +58,7 @@ def extra_letters(word: str) -> Image.Image:
         parts.append(extra * gap_counts[i])
         parts.append(ch)
     parts.append(extra * gap_counts[n])
-    return render_text("".join(parts), uppercase=True)
+    content = render_text("".join(parts), uppercase=True)
+    return with_instruction(
+        content, "Something is wrong with this word. Fix it."
+    )

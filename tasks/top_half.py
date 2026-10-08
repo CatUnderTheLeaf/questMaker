@@ -3,11 +3,12 @@
 from PIL import Image
 
 from tasks import register_task
-from lib.render import render_text
+from lib.render import render_text, with_instruction
 
 
 @register_task(
     name="Top half",
+    type="text",
     description=(
         "The clue-word is cut by a strictly horizontal line through the "
         "middle, so only the upper half is left. The participant needs to "
@@ -24,5 +25,8 @@ from lib.render import render_text
     no_spaces=True,
 )
 def top_half(word: str) -> Image.Image:
-    img = render_text(word.strip(), uppercase=True)
-    return img.crop((0, 0, img.width, img.height // 2))
+    content = render_text(word.strip(), uppercase=True)
+    cropped = content.crop((0, 0, content.width, content.height // 2))
+    return with_instruction(
+        cropped, "Guess the word from the top halves of the letters."
+    )

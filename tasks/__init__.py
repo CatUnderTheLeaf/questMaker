@@ -7,7 +7,7 @@ startup to import all task modules; the registry is then complete.
 
 import importlib
 import pkgutil
-from typing import Callable, Any
+from typing import Callable, Any, Literal
 
 from lib.types import Task
 from PIL import Image
@@ -25,6 +25,7 @@ def register_task(
     name: str,
     description: str,
     hints: list[str],
+    type: Literal["text", "math"] = "text",
     id: str | None = None,
     min_len: int = 1,
     max_len: int | None = None,
@@ -46,6 +47,7 @@ def register_task(
             name=name,
             description=description,
             hints=list(hints),
+            type=type,
             min_len=min_len,
             max_len=max_len,
             no_spaces=no_spaces,

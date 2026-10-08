@@ -3,7 +3,7 @@
 from PIL import Image, ImageDraw
 
 from tasks import UnsuitableWord, register_task
-from lib.render import get_font
+from lib.render import get_font, with_instruction
 
 # Fixed knight's tour on a 3x4 board, 1-indexed positions in visit order.
 _TOUR = [
@@ -53,6 +53,7 @@ def _draw_grid(draw: ImageDraw.ImageDraw, x0: int, y0: int) -> None:
 
 @register_task(
     name="Knight move",
+    type="math",
     description=(
         "Two 3x4 tables side by side. The left table holds the numbers of a "
         "knight's tour, with only 1, 3, 7 and 11 shown. The right table "
@@ -105,4 +106,6 @@ def knight_move(word: str) -> Image.Image:
             fill="black",
             anchor="mm",
         )
-    return img
+    return with_instruction(
+        img, "Follow the knight's path from 1 to 12 to read the word."
+    )

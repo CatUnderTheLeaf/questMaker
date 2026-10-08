@@ -5,7 +5,7 @@ import random
 from PIL import Image, ImageDraw
 
 from tasks import UnsuitableWord, register_task
-from lib.render import get_font
+from lib.render import get_font, with_instruction
 
 _CELL = 100
 _LINE = 5
@@ -57,6 +57,7 @@ def _decoys(letters: str, count: int) -> list[str]:
 
 @register_task(
     name="Table borders",
+    type="text",
     description=(
         "A square 3x3 table shows only its inner borders, no outer frame. "
         "The different letters of the clue-word (at most 9) are randomly "
@@ -124,4 +125,6 @@ def table_borders(word: str) -> Image.Image:
         )
     padded = Image.new("RGB", (width + 2 * _PAD, img.height + 2 * _PAD), "white")
     padded.paste(img, (_PAD, _PAD))
-    return padded
+    return with_instruction(
+        padded, "This table is guarding a secret word."
+    )

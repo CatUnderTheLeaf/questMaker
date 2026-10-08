@@ -6,7 +6,7 @@ import random
 from PIL import Image, ImageDraw
 
 from tasks import UnsuitableWord, register_task
-from lib.render import get_font
+from lib.render import get_font, with_instruction
 
 _SOLUTIONS: dict[int, list[frozenset[tuple[int, int]]]] = {}
 
@@ -91,6 +91,7 @@ def _draw_grid(draw: ImageDraw.ImageDraw, x0: int, y0: int, n: int, cell: int, l
 
 @register_task(
     name="Queens",
+    type="math",
     description=(
         "Two tables of word-length by word-length side by side. The left "
         "table shows only the minimal clues of the unique solution: dots "
@@ -149,4 +150,6 @@ def n_queens(word: str) -> Image.Image:
             fill="black",
             anchor="mm",
         )
-    return img
+    return with_instruction(
+        img, "Place queens so none attack; read the queen cells top to bottom."
+    )
