@@ -18,6 +18,10 @@ def _letter_number(ch: str) -> int:
     raise UnsuitableWord(f"character {ch!r} is not in the English or Russian alphabet")
 
 
+def _difficulty(word: str) -> int:
+    return 2 if len(word.strip()) <= 5 else 3
+
+
 @register_task(
     name="Alphabet numbers",
     type="text",
@@ -34,6 +38,7 @@ def _letter_number(ch: str) -> int:
         "1 is A, 2 is B, 3 is C — count on",
         "Replace each number with the letter in that place in the alphabet",
     ],
+    difficulty=_difficulty,
     min_len=3,
 )
 def alphabet_numbers(word: str) -> Image.Image:

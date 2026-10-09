@@ -11,6 +11,10 @@ _ROTATIONS = (Image.Transpose.ROTATE_90, Image.Transpose.ROTATE_180, Image.Trans
 _SPACING = 8
 
 
+def _difficulty(word: str) -> int:
+    return 1
+
+
 @register_task(
     name="Spinning letters",
     type="text",
@@ -25,6 +29,7 @@ _SPACING = 8
         "Turn each letter back upright",
         "Tilt your head or turn the page",
     ],
+    difficulty=_difficulty,
     min_len=5,
     no_spaces=True,
 )

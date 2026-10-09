@@ -8,6 +8,15 @@ from tasks import UnsuitableWord, register_task
 from utils.render import render_text, with_instruction
 
 
+def _difficulty(word: str) -> int:
+    n = len(word.strip())
+    if n <= 4:
+        return 1
+    if n <= 6:
+        return 2
+    return 3
+
+
 @register_task(
     name="Anagram",
     type="text",
@@ -23,6 +32,7 @@ from utils.render import render_text, with_instruction
         "All letters of the word are there, just mixed up",
         "Write the letters on separate slips and shuffle them",
     ],
+    difficulty=_difficulty,
     min_len=3,
     max_len=8,
     no_spaces=True,

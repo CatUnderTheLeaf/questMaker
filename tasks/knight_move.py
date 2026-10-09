@@ -51,6 +51,10 @@ def _draw_grid(draw: ImageDraw.ImageDraw, x0: int, y0: int) -> None:
             draw.rectangle([x0, y - _LINE // 2, x0 + tw, y + _LINE // 2], fill="black")
 
 
+def _difficulty(word: str) -> int:
+    return 5
+
+
 @register_task(
     name="Knight move",
     type="math",
@@ -68,6 +72,7 @@ def _draw_grid(draw: ImageDraw.ImageDraw, x0: int, y0: int) -> None:
         "Numbers 1, 3, 7 and 11 mark the way",
         "Follow the knight's path to read the word",
     ],
+    difficulty=_difficulty,
     min_len=12,
     max_len=12,
     no_spaces=True,

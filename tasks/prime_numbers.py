@@ -32,6 +32,21 @@ def _letter_prime(ch: str) -> int:
     raise UnsuitableWord(f"character {ch!r} is not in the English or Russian alphabet")
 
 
+def _letter_pos(ch: str) -> int:
+    upper = ch.upper()
+    if upper in _ENGLISH_ALPHABET:
+        return _ENGLISH_ALPHABET.index(upper) + 1
+    if upper in _RUSSIAN_ALPHABET:
+        return _RUSSIAN_ALPHABET.index(upper) + 1
+    return 0
+
+
+def _difficulty(word: str) -> int:
+    positions = [_letter_pos(ch) for ch in word.strip().upper() if ch.isalpha()]
+    avg_pos = sum(positions) / len(positions) if positions else 0
+    return 5 if avg_pos >= 15 else 4
+
+
 @register_task(
     name="Prime numbers",
     type="math",
@@ -41,14 +56,15 @@ def _letter_prime(ch: str) -> int:
         "number in the prime sequence starting with 2 (A=2, B=3, C=5, and so "
         "on). The participant needs to know what a prime number is and "
         "calculate the sequence or look it up to recover the word. The "
-        "difficulty depends on the word's length and on the letters: X, Y, Z "
-        "sit far down the alphabet and their primes take real work."
+        "difficulty depends on the letters: the further down the alphabet, "
+        "the larger the primes and the more work they take."
     ),
     hints=[
         "Each number hides a letter",
         "These are not random numbers — they are prime",
         "A is the 1st prime, B the 2nd, C the 3rd: 2, 3, 5, 7, 11...",
     ],
+    difficulty=_difficulty,
     min_len=3,
 )
 def prime_numbers(word: str) -> Image.Image:

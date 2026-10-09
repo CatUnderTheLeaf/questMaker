@@ -85,9 +85,8 @@ def _product_pool_for(ch: str) -> tuple[str, list[str]]:
     raise UnsuitableWord(f"character {ch!r} is not in the English or Russian alphabet")
 
 
-def _product_for(ch: str) -> str:
-    _, pool = _product_pool_for(ch)
-    return random.choice(pool)
+def _difficulty(word: str) -> int:
+    return 2 if len(word.strip()) <= 6 else 3
 
 
 @register_task(
@@ -107,6 +106,7 @@ def _product_for(ch: str) -> str:
         "Look at the first letters of the lines",
         "Read the first letter of each line from top to bottom",
     ],
+    difficulty=_difficulty,
     min_len=4,
     no_spaces=True,
 )

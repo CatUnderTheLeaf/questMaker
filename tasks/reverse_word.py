@@ -6,6 +6,10 @@ from tasks import register_task
 from utils.render import render_text, with_instruction
 
 
+def _difficulty(word: str) -> int:
+    return 1 if len(word.strip()) <= 4 else 2
+
+
 @register_task(
     name="Reverse word",
     type="text",
@@ -20,6 +24,7 @@ from utils.render import render_text, with_instruction
         "Read the letters right to left",
         "The last letter is actually the first",
     ],
+    difficulty=_difficulty,
     min_len=3,
 )
 def reverse_word(word: str) -> Image.Image:

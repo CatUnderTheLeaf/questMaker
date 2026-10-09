@@ -24,6 +24,10 @@ def _shift_char(ch: str) -> str:
     raise UnsuitableWord(f"character {ch!r} is not in the English or Russian alphabet")
 
 
+def _difficulty(word: str) -> int:
+    return 4
+
+
 @register_task(
     name="Caesar cipher",
     type="text",
@@ -39,6 +43,7 @@ def _shift_char(ch: str) -> str:
         "Each letter is shifted forward in the alphabet",
         "Shift every letter back by 3 to read the word",
     ],
+    difficulty=_difficulty,
     min_len=5,
 )
 def caesar(word: str) -> Image.Image:

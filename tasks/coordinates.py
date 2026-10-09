@@ -38,6 +38,10 @@ def _draw_grid(draw: ImageDraw.ImageDraw, x0: int, y0: int, n: int) -> None:
             draw.rectangle([x0, y - _LINE // 2, x0 + size, y + _LINE // 2], fill="black")
 
 
+def _difficulty(word: str) -> int:
+    return 2 if len(set(word.strip().upper())) <= 4 else 3
+
+
 @register_task(
     name="Coordinates",
     type="math",
@@ -55,6 +59,7 @@ def _draw_grid(draw: ImageDraw.ImageDraw, x0: int, y0: int, n: int) -> None:
         "The first digit is the row, the second is the column",
         "Count rows and columns from 1 to find each letter",
     ],
+    difficulty=_difficulty,
     min_len=3,
     no_spaces=True,
 )

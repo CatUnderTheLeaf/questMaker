@@ -25,6 +25,7 @@ def register_task(
     name: str,
     description: str,
     hints: list[str],
+    difficulty: Callable[[str], int],
     type: Literal["text", "math"] = "text",
     id: str | None = None,
     min_len: int = 1,
@@ -35,7 +36,9 @@ def register_task(
     """Decorator that registers an ``encode(word) -> PIL.Image`` function.
 
     The task id defaults to the function name. Registering a duplicate id
-    raises ``ValueError``.
+    raises ``ValueError``. ``difficulty`` is a required word-aware scorer
+    returning int 1-5 (1=instant, 2=single-step, 3=key lookup, 4=cipher/math,
+    5=chess/multi-constraint); longer / trickier words score higher.
     """
 
     def decorator(fn: Callable[[str], Image.Image]) -> Callable[[str], Image.Image]:
@@ -53,6 +56,7 @@ def register_task(
             no_spaces=no_spaces,
             max_distinct=max_distinct,
             encode=fn,
+            difficulty=difficulty,
         )
         return fn
 

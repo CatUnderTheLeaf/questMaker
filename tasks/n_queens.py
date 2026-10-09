@@ -89,6 +89,10 @@ def _draw_grid(draw: ImageDraw.ImageDraw, x0: int, y0: int, n: int, cell: int, l
             draw.rectangle([x0, y - line // 2, x0 + size, y + line // 2], fill="black")
 
 
+def _difficulty(word: str) -> int:
+    return 4 if len(word.strip()) <= 5 else 5
+
+
 @register_task(
     name="Queens",
     type="math",
@@ -107,6 +111,7 @@ def _draw_grid(draw: ImageDraw.ImageDraw, x0: int, y0: int, n: int, cell: int, l
         "Queens must not attack each other",
         "Read the queen cells from the top row down",
     ],
+    difficulty=_difficulty,
     min_len=4,
     max_len=8,
     no_spaces=True,

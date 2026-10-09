@@ -55,6 +55,10 @@ def _decoys(letters: str, count: int) -> list[str]:
     return random.sample(candidates, min(count, len(candidates)))
 
 
+def _difficulty(word: str) -> int:
+    return 3
+
+
 @register_task(
     name="Table borders",
     type="text",
@@ -73,6 +77,7 @@ def _decoys(letters: str, count: int) -> list[str]:
         "Find the letter in the cell with these borders",
         "Letters whose shapes never appear below are decoys",
     ],
+    difficulty=_difficulty,
     min_len=3,
     no_spaces=True,
     max_distinct=9,

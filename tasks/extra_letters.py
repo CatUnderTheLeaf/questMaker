@@ -11,6 +11,10 @@ _RUSSIAN_ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫ�
 _ENGLISH_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
+def _difficulty(word: str) -> int:
+    return 2 if len(word.strip()) <= 5 else 3
+
+
 @register_task(
     name="Extra letters",
     type="text",
@@ -26,6 +30,7 @@ _ENGLISH_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "The same extra letter was added several times",
         "Cross out the letter that stands out",
     ],
+    difficulty=_difficulty,
     min_len=3,
     no_spaces=True,
 )
