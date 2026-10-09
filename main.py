@@ -1,5 +1,3 @@
-from typing import Literal
-
 import json
 
 from google import genai
@@ -8,29 +6,50 @@ import streamlit as st
 from tasks import load_tasks
 
 from utils.types import CatalogEntry, QuestRequest, QuestResponse
+from utils.pdf import QuestStop, build_quest_pdf
 
 # Temporary: mock the model response for UI design (no model call).
 USE_MOCK_RESPONSE = True
-MOCK_CLUE_WORDS = "table, cat, refrigerator"
+MOCK_CLUE_WORDS = "table, cat, refrigerator, balcony, coach, kettle, bathroom"
 MOCK_PARTICIPANTS = (
     "my kids are 6 years old, know a little bit of math, "
     "just simple subtraction and addition."
 )
+MOCK_PARTICIPANTS_ALT = (
+    "my kids are 12 years old, "
+    "they love math and puzzles."
+)
 MOCK_RESPONSE = {
     "picks": [
-        {
-            "task_id": "table_borders",
-            "why": "A short, visual table-based game that relies on spatial recognition rather than complex arithmetic.",
-        },
-        {
-            "task_id": "reverse_word",
-            "why": "Simple for 6-year-olds; reversing a short word like 'cat' is an easy and engaging logic puzzle.",
-        },
-        {
-            "task_id": "shopping_list",
-            "why": "Observational and intuitive, requiring only basic reading skills, perfectly suited for young children.",
-        },
-    ]
+    {
+      "task_id": "table_borders",
+      "why": "A 3x3 table with letters and visual border decoding."
+    },
+    {
+      "task_id": "anagram",
+      "why": "Rearranging shuffled letters to recover the word."
+    },
+    {
+      "task_id": "knight_move",
+      "why": "Involves chess knight moves and tour orders."
+    },
+    {
+      "task_id": "n_queens",
+      "why": "Involves the chess queen puzzle and board cells."
+    },
+    {
+      "task_id": "shopping_list",
+      "why": "Observational task using first letters of items."
+    },
+    {
+      "task_id": "prime_numbers",
+      "why": "Replaces letters with prime numbers using alphabet order."
+    },
+    {
+      "task_id": "coordinates",
+      "why": "Uses a table with row and column cell coordinates."
+    }
+  ]
 }
 
 TASKS = load_tasks()
@@ -43,21 +62,42 @@ SYSTEM_INSTRUCTION = (
     "picks[i] is for words[i] and task_id must come from candidates[i]. "
     "Judge suitability from the task description in catalog[id].description "
     "(name and type are secondary). "
-    "Honor type_preference; user_message is context only. "
-    "Keep why short."
+    "type_preference controls the mix of catalog entry types ('text' vs 'math'): "
+    "'Any' means ignore type; 'More text' means prefer entries with type 'text'; "
+    "'More math' means prefer entries with type 'math'; 'Balanced' means alternate "
+    "between 'text' and 'math' across picks. "
+    "Preference is a tiebreaker: when two candidate tasks suit a word about equally, "
+    "pick the one matching the preference; never pick a clearly unsuitable task just "
+    "to satisfy the mix. "
+    "user_message is context which can help guide the selection. "
+    "Keep why short but explanatory, not just a description of the task."
 )
 
 
 def build_prompt(req: QuestRequest) -> str:
-    return (
-        "Select the most suitable task for each word "
-        "based on its description in catalog.\n"
-        f"{req.model_dump_json(indent=2)}\n"
-        "Return picks aligned positionally to words."
-    )
+    return req.model_dump_json(indent=2)
 
-st.set_page_config(page_title="QuestMaker chat")
-st.title("Quest builder")
+st.set_page_config(page_title="QuestMaker", page_icon=":material/map:")
+st.title("QuestMaker", icon=":material/map:")
+st.markdown("Hide the treasure, we'll make the hunt")
+st.caption(
+    "You pick the hiding spots — we turn each one into a puzzle "
+    "that points to the next."
+)
+
+st.space("small")
+steps = st.columns(3, border=True, gap="small")
+with steps[0]:
+    st.markdown(":material/location_on: **You hide**")
+    st.caption("List your spots: couch, fridge, balcony")
+with steps[1]:
+    st.markdown(":material/extension: **We puzzle**")
+    st.caption("We pick a perfect little brain-teaser per spot")
+with steps[2]:
+    st.markdown(":material/emoji_events: **They hunt**")
+    st.caption("Each answer reveals where to sneak to next")
+
+st.space("small")
 
 
 @st.cache_resource
@@ -69,15 +109,16 @@ def get_client():
 
 client = get_client()
 
-WORKING_MODELS = ["gemini-3.1-flash-lite","gemini-3.5-flash", "gemini-3.5-flash-lite"]
+WORKING_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
 
 st.session_state.setdefault("ai_model", WORKING_MODELS[0])
 st.session_state.setdefault("messages", [])
 st.session_state.setdefault("prev_interaction_id", None)
-st.session_state.setdefault("quest_items", [])
 st.session_state.setdefault("eligibility_words", [])
 st.session_state.setdefault("quest_request_json", None)
 st.session_state.setdefault("quest_response_json", None)
+st.session_state.setdefault("quest_images", [])
+st.session_state.setdefault("quest_fingerprint", None)
 if USE_MOCK_RESPONSE:
     st.session_state.setdefault("clue_words", MOCK_CLUE_WORDS)
     st.session_state.setdefault("participants_info", MOCK_PARTICIPANTS)
@@ -89,80 +130,49 @@ with st.sidebar:
         st.session_state.prev_interaction_id = None
         st.rerun()
 
-with st.form("quest_words", border=False):
-    clue_words = st.text_input(
-        "Clue-words",
-        placeholder="coach, dinner table",
-        key="clue_words",
-    )
-    st.segmented_control(
-        "Task mix",
-        ["Any", "More text", "More math", "Balanced"],
-        default="Any",
-        key="type_preference",
-    )
-    st.text_area(
-        "Participants",
-        placeholder="Age, knowledge, preferences, e.g. kids 8-10, easy math",
-        key="participants_info",
-        max_chars=500,
-    )
-    submitted = st.form_submit_button(
-        "Generate tasks", type="primary", icon=":material/play_arrow:"
-    )
+
+# Main part
+
+
+with st.container(border=False, gap="small"):
+    st.subheader("Create your quest", icon=":material/play_arrow:")
+    st.caption("Add your hiding spots and tell us who is hunting.")
+    with st.form("quest_words", border=False):
+
+        st.segmented_control(
+            "Task mix",
+            ["Any", "More text", "More math", "Balanced"],
+            default="Any",
+            key="type_preference",
+        )
+        clue_words = st.text_input(
+            "Clue-words",
+            placeholder="coach, dinner table",
+            key="clue_words",
+        )
+        st.text_area(
+            "How do you describe your participants?",
+            placeholder="Age, knowledge, preferences, e.g. kids 8-10, easy math",
+            key="participants_info",
+            max_chars=500,
+        )
+        submitted = st.form_submit_button(
+            "Make my hunt", type="primary", icon=":material/play_arrow:"
+        )
 
 if submitted:
-    for key in [k for k in st.session_state if k.startswith("hint_")]:
-        del st.session_state[key]
     words = [w.strip() for w in clue_words.split(",") if w.strip()]
     st.session_state.eligibility_words = words
     st.session_state.quest_request_json = None
     st.session_state.quest_response_json = None
-    # items = []
-    # skipped = []
-    # for w in words:
-    #     encoded_any = False
-    #     errors = []
-    #     for task_id in TASK_ORDER:
-    #         task = TASKS[task_id]
-    #         if not task.eligible(w):
-    #             continue
-    #         try:
-    #             encode = getattr(task, "encode", None)
-    #             if not callable(encode):
-    #                 raise TypeError(f"Task {task.name!r} does not provide a callable encode() method")
-
-    #             items.append(
-    #                 {
-    #                     "word": w,
-    #                     "task_id": task.id,
-    #                     "task_name": task.name,
-    #                     "image": encode(w),
-    #                     "hints": task.hints,
-    #                 }
-    #             )
-    #             encoded_any = True
-    #         except Exception as e:
-    #             errors.append(f"Could not encode {w!r} with {task.name}: {e}")
-    #     if not encoded_any:
-    #         skipped.append(w)
-    #         for msg in errors:
-    #             st.error(msg)
-    # st.session_state.quest_items = items
-    # if skipped:
-    #     st.warning(f"Skipped (unsuitable for all tasks): {', '.join(skipped)}")
+    st.session_state.quest_images = []
+    st.session_state.quest_fingerprint = None
+    
 
 if st.session_state.eligibility_words:
-    pref_map: dict[str, Literal["any", "more_text", "more_math", "balanced"]] = {
-        "Any": "any",
-        "More text": "more_text",
-        "More math": "more_math",
-        "Balanced": "balanced",
-    }
-    type_preference = pref_map.get(
-        st.session_state.get("type_preference", "Any"),
-        "any",
-    )
+    type_preference = st.session_state.get("type_preference", "Any")
+    if type_preference not in ("Any", "More text", "More math", "Balanced"):
+        type_preference = "Any"
     candidates = [
         [tid for tid in TASK_ORDER if TASKS[tid].eligible(w)]
         for w in st.session_state.eligibility_words
@@ -236,51 +246,95 @@ if st.session_state.eligibility_words:
                     f"{len(quest.picks)} picks for {len(words)} words."
                 )
             else:
+                st.subheader("Your hunt", icon=":material/map:")
+                st.caption(f"{len(words)} stops • Solve each to find the next")
+                # Fingerprint the current quest. If words or picked tasks changed,
+                # drop cached images so a fresh set is generated once.
+                fingerprint = [(w, sel.task_id) for w, sel in zip(words, quest.picks)]
+                if st.session_state.quest_fingerprint != fingerprint:
+                    st.session_state.quest_fingerprint = fingerprint
+                    st.session_state.quest_images = [None] * len(words)
                 for i, (w, sel) in enumerate(zip(words, quest.picks)):
                     task = TASKS.get(sel.task_id)
                     if task is None:
                         st.error(f"Unknown task id: {sel.task_id!r}")
                         continue
-                    try:
-                        encode = getattr(task, "encode", None)
-                        if not callable(encode):
-                            raise TypeError(
-                                f"Task {task.name!r} does not provide a callable encode() method"
-                            )
-                        image: object = encode(w)
-                    except Exception as e:
-                        st.error(f"Could not encode {w!r} with {task.name}: {e}")
-                        continue
+                    # Reuse the already-generated image. Hint pills only change
+                    # selection state, so encode() must NOT run again here.
+                    image = st.session_state.quest_images[i]
+                    if image is None:
+                        try:
+                            encode = getattr(task, "encode", None)
+                            if not callable(encode):
+                                raise TypeError(
+                                    f"Task {task.name!r} does not provide a callable encode() method"
+                                )
+                            image = encode(w)
+                            imgs = list(st.session_state.get("quest_images", []))
+                            # update copy and reassign to avoid typing issues with session_state __setitem__
+                            imgs[i] = image
+                            st.session_state["quest_images"] = imgs
+                        except Exception as e:
+                            st.error(f"Could not encode {w!r} with {task.name}: {e}")
+                            continue
+                    is_last = i == len(words) - 1
                     with st.container(border=True):
-                        st.subheader(f"{i + 1}. {w} — {task.name}")
-                        if sel.why:
-                            st.caption(sel.why)
-                        img_col, hint_col = st.columns(2)
+                        if is_last:
+                            st.badge(
+                                f"Final stop — {w} → prize",
+                                icon=":material/emoji_events:",
+                                color="green",
+                            )
+                        else:
+                            st.badge(
+                                f"Stop {i + 1} — {w}",
+                                icon=":material/location_on:",
+                                color="blue",
+                            )
+                        img_col, hint_col = st.columns(2, vertical_alignment="center")
                         with img_col:
                             st.image(image, alt=f"{task.name} task for {w}")  # type: ignore
                         with hint_col:
-                            st.pills(
-                                "Hint",
-                                task.hints,
-                                selection_mode="single",
-                                wrap=True,
-                                key=f"hint_{i}",
-                            )
+                            st.markdown(f":material/extension: **{task.name}**")
+                            if sel.why:
+                                st.caption(sel.why)
+                            with st.expander(f"Need a nudge?"):
+                                st.markdown(
+                                    "\n".join(f"- {h}" for h in task.hints)
+                                )
+                    if not is_last:
+                        st.caption(
+                            ":material/arrow_downward: Solve to reveal the next clue",
+                            text_alignment="center",
+                        )
+                # Export the rendered quest (cached images + hint lists).
+                stops = []
+                for i, (w, sel) in enumerate(zip(words, quest.picks)):
+                    task = TASKS.get(sel.task_id)
+                    images = st.session_state.get("quest_images", [])
+                    img = images[i] if task is not None and i < len(images) else None
+                    if task is None or img is None:
+                        continue
+                    stops.append(
+                        QuestStop(
+                            number=i + 1,
+                            clue_word=w,
+                            image=img,
+                            hints=list(task.hints),
+                            task_name=task.name,
+                        )
+                    )
+                if stops:
+                    with st.container(horizontal_alignment="right"):
+                        st.download_button(
+                            "Print my hunt",
+                            data=build_quest_pdf(stops),
+                            file_name="quest.pdf",
+                            mime="application/pdf",
+                            icon=":material/picture_as_pdf:",
+                            type="primary",
+                        )
 
-# for i, item in enumerate(st.session_state.quest_items):
-#     with st.container(border=True):
-#         st.subheader(f"{i + 1}. {item['word']} — {item['task_name']}")
-#         img_col, hint_col = st.columns(2)
-#         with img_col:
-#             st.image(item["image"], alt=f"{item['task_name']} task for {item['word']}")
-#         with hint_col:
-#             st.pills(
-#                 "Hint",
-#                 item["hints"],
-#                 selection_mode="single",
-#                 wrap=True,
-#                 key=f"hint_{i}",
-#             )
 
 with st.sidebar:
     if prompt := st.chat_input("What is up?"):

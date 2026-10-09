@@ -42,7 +42,7 @@ class QuestRequest(BaseModel):
     words: list[str]                    
     candidates: list[list[str]]         
     catalog: dict[str, CatalogEntry]
-    type_preference: Literal["any", "more_text", "more_math", "balanced"] = "any"
+    type_preference: Literal["Any", "More text", "More math", "Balanced"] = "Any"
     user_message: str = ""  # raw wish, capped ~500 chars, context only
 
     @model_validator(mode="after")
