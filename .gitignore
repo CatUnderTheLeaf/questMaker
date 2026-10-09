@@ -222,4 +222,3 @@ __marimo__/
 # Local configuration files
 .vscode/settings.json
 .python-version
-*.lock
