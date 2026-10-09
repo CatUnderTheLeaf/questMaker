@@ -67,7 +67,7 @@ def load_tasks() -> dict[str, Task]:
     being silently skipped.
     """
     package = __name__
-    pkg = importutils.import_module(package)
+    pkg = importlib.import_module(package)
     path: Any = getattr(pkg, "__path__", None)
     if path is None:  # pragma: no cover - defensive, always a package
         raise RuntimeError(f"{package!r} is not a package")
@@ -76,7 +76,7 @@ def load_tasks() -> dict[str, Task]:
             continue
         full_name = f"{package}.{mod.name}"
         try:
-            importutils.import_module(full_name)
+            importlib.import_module(full_name)
         except Exception as e:
             raise RuntimeError(f"Failed to load task module {full_name!r}") from e
     return REGISTRY
