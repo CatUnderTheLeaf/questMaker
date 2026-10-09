@@ -5,7 +5,7 @@ import random
 from PIL import Image
 
 from tasks import register_task
-from lib.render import render_text, with_instruction
+from utils.render import render_text, with_instruction
 
 _ROTATIONS = (Image.Transpose.ROTATE_90, Image.Transpose.ROTATE_180, Image.Transpose.ROTATE_270)
 _SPACING = 8

@@ -3,7 +3,7 @@
 from PIL import Image
 
 from tasks import UnsuitableWord, register_task
-from lib.render import render_text, with_instruction
+from utils.render import render_text, with_instruction
 
 _ENGLISH_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 _RUSSIAN_ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"

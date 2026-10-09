@@ -3,7 +3,7 @@
 from PIL import Image
 
 from tasks import register_task
-from lib.render import render_text, with_instruction
+from utils.render import render_text, with_instruction
 
 
 @register_task(

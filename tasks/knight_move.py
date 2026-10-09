@@ -3,7 +3,7 @@
 from PIL import Image, ImageDraw
 
 from tasks import UnsuitableWord, register_task
-from lib.render import get_font, with_instruction
+from utils.render import get_font, with_instruction
 
 # Fixed knight's tour on a 3x4 board, 1-indexed positions in visit order.
 _TOUR = [

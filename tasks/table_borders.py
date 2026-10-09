@@ -5,7 +5,7 @@ import random
 from PIL import Image, ImageDraw
 
 from tasks import UnsuitableWord, register_task
-from lib.render import get_font, with_instruction
+from utils.render import get_font, with_instruction
 
 _CELL = 100
 _LINE = 5

@@ -7,7 +7,7 @@ import streamlit as st
 
 from tasks import load_tasks
 
-from lib.types import CatalogEntry, QuestRequest, QuestResponse
+from utils.types import CatalogEntry, QuestRequest, QuestResponse
 
 # Temporary: mock the model response for UI design (no model call).
 USE_MOCK_RESPONSE = True
