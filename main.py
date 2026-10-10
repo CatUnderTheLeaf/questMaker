@@ -64,21 +64,34 @@ SYSTEM_INSTRUCTION = (
     "Each candidate carries score 1-5, the effective difficulty of that word "
     "with that task (1=instant, 2=single-step, 3=key lookup, 4=cipher/math, "
     "5=chess/multi-constraint). "
-    "Judge mechanics from catalog[id].description; judge fit from score. "
+    "Judge fit from score first; catalog[id].description only tells you the mechanic. "
+    "A vivid description never justifies a higher score. "
     "user_message is the participant profile (age, knowledge, skill). Map it "
-    "to a preferred band: younger than 10 years old prefer 1-3, "
-    "~10-14 years old prefer 2-4, 15+ years old prefer 3-5. "
-    "If user_message is empty or too vague to infer age/skill, prefer 2-4 (medium). "
+    "to an allowed band: younger than 10 years old allow 1-3 "
+    "(e.g. \"my kids are 6 years old\" -> 1-3, \"kids 8-10\" -> 1-3), "
+    "~10-14 years old allow 2-4 (e.g. \"12 years old, loves math\" -> 2-4), "
+    "15+ years old allow 3-5. "
+    "If user_message is empty or too vague to infer age/skill, allow 2-4 (medium). "
+    "The band top is a hard ceiling: never pick above it for any reason. "
     "Rules in priority order. "
-    "(1) Uniqueness is absolute: each task_id must be used at most once across picks. "
-    "Allocate most-constrained first: reason over longest words / fewest candidates "
-    "in band first, shortest last, but output still as picks[i] for words[i]. "
-    "Only if no unused candidate exists at any score, repeat the best fitting task. "
-    "(2) Difficulty preferably within the band: stay inside it when possible; "
-    "exceed the band top only to stay unique. Within the band, balance total effort: "
-    "longer words get lower scores and shorter words get higher scores, "
-    "so each stop takes similar effort. "
-    "(3) Never pick far below the band for older/skilled and experts "
+    "(1) Band ceiling is absolute: every pick must be inside the band. "
+    "There are always enough tasks inside the band — never leave it. "
+    "(2) Uniqueness inside the band: each task_id must be used at most once. "
+    "Only if a word has no unused in-band candidate left, repeat that word's "
+    "lowest-score in-band task. "
+    "(3) Work longest word first, shortest last (output still as picks[i] for words[i]). "
+    "Sort the words by length descending; break ties by fewer in-band candidates first. "
+    "Give the longest word the lowest-score unused in-band candidate. "
+    "Then go word by word down the sorted list, each time giving that word "
+    "the lowest-score still-unused in-band candidate. "
+    "A longer word must never get a higher score than a shorter word: "
+    "giving the longest word the hardest puzzle is always wrong. "
+    "Long words do NOT get harder puzzles to 'balance effort'; it is the opposite: "
+    "an easy mechanic on a long word costs about as much effort as a harder "
+    "mechanic on a short word. "
+    "Example: refrigerator(12 letters) gets score 1, bathroom(8)/balcony(7) get "
+    "score 2, table/coach/kettle/cat get the remaining higher scores. "
+    "(4) Never pick far below the band for older/skilled and experts "
     "(a score-1 task on a short word like 'cat' is trivial for 12-year-olds); "
     "for young/beginners low scores are ideal. "
     "type_preference controls the mix of catalog entry types ('text' vs 'math'): "
@@ -303,6 +316,7 @@ client = get_client()
 WORKING_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
 
 st.session_state.setdefault("ai_model", WORKING_MODELS[0])
+st.session_state.setdefault("ai_model_used", WORKING_MODELS[0])
 st.session_state.setdefault("eligibility_words", [])
 st.session_state.setdefault("quest_request_json", None)
 st.session_state.setdefault("quest_response_json", None)
@@ -412,7 +426,7 @@ if st.session_state.eligibility_words:
                     response_schema=QuestResponse.model_json_schema(),
                     timeout=60,
                 )
-                st.session_state.ai_model = used_model
+                st.session_state["ai_model_used"] = used_model
                 if fell_back:
                     st.caption("High demand — used backup model")
                 raw = interaction.output_text or ""
@@ -616,7 +630,7 @@ if st.session_state.eligibility_words:
                                                     response_schema=Selection.model_json_schema(),
                                                     timeout=60,
                                                 )
-                                                st.session_state.ai_model = used_model
+                                                st.session_state["ai_model_used"] = used_model
                                                 result = Selection.model_validate_json(
                                                     interaction.output_text or ""
                                                 )
