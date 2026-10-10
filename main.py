@@ -71,11 +71,14 @@ SYSTEM_INSTRUCTION = (
     "too vague to infer age/skill, aim 2-4 (medium). "
     "Prefer candidates at or just above the target; never pick far below it "
     "(a score-1 task on a short word like 'cat' is trivial for 12-year-olds). "
-    "Prefer each task_id used at most once across picks: a solved mechanic is "
-    "no challenge again. If no unused candidate fits the target, drop below "
-    "the target to stay unique (a fresh easier puzzle beats repeating a solved "
-    "one); never go above the kids' ability just for uniqueness — repeat a "
-    "fitting task rather than serve a frustrating one. "
+    "Allocate most-constrained first: reason over longest words / fewest candidates "
+    "at target band first, shortest last, but output still as picks[i] for words[i]. "
+    "Each task_id MUST be used at most once across picks: a solved mechanic is "
+    "no challenge again. If no unused candidate fits the target band, go up to "
+    "+1 above target to stay unique (e.g. young/beginners target 1-2 may use 3); "
+    "never go +2 or into 4-5 for under-10s just for uniqueness. "
+    "Only if no unused candidate exists within target or target+1, you may repeat "
+    "the best fitting task. "
     "type_preference controls the mix of catalog entry types ('text' vs 'math'): "
     "'Any' means ignore type; 'More text' means prefer entries with type 'text'; "
     "'More math' means prefer entries with type 'math'; 'Balanced' means alternate "
@@ -249,13 +252,14 @@ def create_with_fallback(
                 },
                 timeout=timeout,
             )
-            if model != preferred:
+            if model != preferred and DEV_MODE:
                 print(f"Model fallback: {preferred!r} busy, used {model!r}")
             return interaction, model, idx > 0
         except Exception as e:
             last_error = e
             if _is_quota_error(e) and idx < len(ordered) - 1:
-                print(f"Model {model!r} quota hit ({type(e).__name__}), trying next...")
+                if DEV_MODE:
+                    print(f"Model {model!r} quota hit ({type(e).__name__}), trying next...")
                 continue
             raise
     assert last_error is not None
@@ -383,15 +387,16 @@ if st.session_state.eligibility_words:
         type_preference=type_preference,
         user_message=st.session_state.get("participants_info", "").strip()[:500],
     )
-    print(request.model_dump_json(indent=2))
-    
+    if DEV_MODE:
+        print(request.model_dump_json(indent=2))
 
     model_slot = st.container()
     if USE_MOCK_RESPONSE:
         if st.session_state.quest_response_json is None:
             st.session_state.quest_request_json = request.model_dump_json()
             st.session_state.quest_response_json = json.dumps(MOCK_RESPONSE, indent=2)
-            print(st.session_state.quest_response_json)
+            if DEV_MODE:
+                print(st.session_state.quest_response_json)
     elif any(not ids for ids in candidates):
         st.warning("Skipped model call: a word has no eligible tasks.")
     elif st.session_state.quest_request_json != request.model_dump_json():
@@ -414,12 +419,14 @@ if st.session_state.eligibility_words:
                     sel.why = sel.why[:120]
                 st.session_state.quest_request_json = request.model_dump_json()
                 st.session_state.quest_response_json = result.model_dump_json(indent=2)
-                print(st.session_state.quest_response_json)
+                if DEV_MODE:
+                    print(st.session_state.quest_response_json)
             except Exception as e:
                 st.error(f"Model call failed: {type(e).__name__}: {e}")
                 with st.expander("Debug details"):
                     st.exception(e)
-                print(f"Model call failed: {type(e).__name__}: {e}")
+                if DEV_MODE:
+                    print(f"Model call failed: {type(e).__name__}: {e}")
     if st.session_state.quest_response_json:
         try:
             quest = QuestResponse.model_validate_json(
@@ -633,7 +640,7 @@ if st.session_state.eligibility_words:
                                                 new_why = result.why[:120]
                                                 repeated = new_id in locked_set
                                             except Exception as e:
-                                                print(f"Repick model failed, fallback: {e}")
+                                                if DEV_MODE:print(f"Repick model failed, fallback: {e}")
                                                 new_id, repeated = pick_local_replacement(
                                                     options,
                                                     sel.task_id,
