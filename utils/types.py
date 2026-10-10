@@ -55,7 +55,7 @@ class QuestRequest(BaseModel):
     words: list[str]                    
     candidates: list[list[ScoredOption]]
     catalog: dict[str, CatalogEntry]
-    type_preference: Literal["Any", "More text", "More math", "Balanced"] = "Any"
+    type_preference: Literal["More text", "More math", "Balanced"] = "Balanced"
     user_message: str = ""  # participant profile (age, skill); empty means pick medium difficulty
 
     @model_validator(mode="after")

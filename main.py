@@ -95,7 +95,7 @@ SYSTEM_INSTRUCTION = (
     "(a score-1 task on a short word like 'cat' is trivial for 12-year-olds); "
     "for young/beginners low scores are ideal. "
     "type_preference controls the mix of catalog entry types ('text' vs 'math'): "
-    "'Any' means ignore type; 'More text' means prefer entries with type 'text'; "
+    "'More text' means prefer entries with type 'text'; "
     "'More math' means prefer entries with type 'math'; 'Balanced' means alternate "
     "between 'text' and 'math' across picks. "
     "Preference is a tiebreaker: when two candidate tasks suit a word about equally, "
@@ -138,7 +138,7 @@ def pick_local_replacement(
     current_id: str,
     locked_ids: set[str],
     reason: str,
-    type_preference: str = "Any",
+    type_preference: str = "Balanced",
     catalog: dict[str, CatalogEntry] | None = None,
 ) -> tuple[str | None, bool]:
     """Pick a replacement from already-scored candidates.
@@ -343,8 +343,8 @@ with st.container(border=False, gap="small"):
 
         st.segmented_control(
             "Task mix",
-            ["Any", "More text", "More math", "Balanced"],
-            default="Any",
+            ["More text", "More math", "Balanced"],
+            default="Balanced",
             key="type_preference",
         )
         clue_words = st.text_input(
@@ -378,9 +378,9 @@ if submitted:
     
 
 if st.session_state.eligibility_words:
-    type_preference = st.session_state.get("type_preference", "Any")
-    if type_preference not in ("Any", "More text", "More math", "Balanced"):
-        type_preference = "Any"
+    type_preference = st.session_state.get("type_preference", "Balanced")
+    if type_preference not in ("More text", "More math", "Balanced"):
+        type_preference = "Balanced"
     candidates = [
         [
             ScoredOption(task_id=tid, score=TASKS[tid].score(w))
