@@ -192,6 +192,20 @@ def build_repick_prompt(
     return json.dumps(payload, indent=2)
 
 
+def _request_repick(i: int) -> None:
+    """on_click callback: mark stop i for replacement before the next run.
+
+    Callbacks run before the script body, so the render loop already knows
+    a replacement is in flight and can keep showing the cached old image
+    instead of re-encoding it.
+    """
+    pending = st.session_state.get("repick_pending")
+    if not isinstance(pending, dict):
+        pending = {}
+        st.session_state["repick_pending"] = pending
+    pending[i] = True
+
+
 def _is_quota_error(e: Exception) -> bool:
     status = getattr(e, "status", None) or getattr(getattr(e, "response", None), "status_code", None)
     if status == 429:
@@ -252,17 +266,18 @@ st.title("QuestMaker", icon=":material/map:")
 st.markdown("Hide the treasure, we'll make the hunt")
 st.caption(
     "You pick the hiding spots — we turn each one into a puzzle "
-    "that points to the next."
+    "that points to the next. "
+    "Puzzles are AI-selected (Google Gemini flash-lite family) from a large catalog, not AI-generated."
 )
 
 st.space("small")
 steps = st.columns(3, border=True, gap="small")
 with steps[0]:
     st.markdown(":material/location_on: **You hide**")
-    st.caption("List your spots: couch, fridge, balcony")
+    st.caption("List your spots, e.g., couch, fridge, balcony")
 with steps[1]:
     st.markdown(":material/extension: **We puzzle**")
-    st.caption("We pick a perfect little brain-teaser per spot")
+    st.caption("The right brain-teaser per spot")
 with steps[2]:
     st.markdown(":material/emoji_events: **They hunt**")
     st.caption("Each answer reveals where to sneak to next")
@@ -288,6 +303,7 @@ st.session_state.setdefault("quest_response_json", None)
 st.session_state.setdefault("quest_images", [])
 st.session_state.setdefault("quest_fingerprint", None)
 st.session_state.setdefault("repick_notice", {})
+st.session_state.setdefault("repick_pending", {})
 if USE_MOCK_RESPONSE:
     st.session_state.setdefault("clue_words", MOCK_CLUE_WORDS)
     st.session_state.setdefault("participants_info", MOCK_PARTICIPANTS)
@@ -312,12 +328,12 @@ with st.container(border=False, gap="small"):
             key="type_preference",
         )
         clue_words = st.text_input(
-            "Clue-words",
+            "Clue-words *",
             placeholder="coach, dinner table",
             key="clue_words",
         )
         st.text_area(
-            "How do you describe your participants?",
+            "How do you describe your participants? (This data is not stored)",
             placeholder="Age, knowledge, preferences, e.g. kids 8-10, easy math",
             key="participants_info",
             max_chars=500,
@@ -325,6 +341,10 @@ with st.container(border=False, gap="small"):
         submitted = st.form_submit_button(
             "Make my hunt", type="primary", icon=":material/play_arrow:"
         )
+    st.caption(
+        "AI selection may misjudge difficulty and may repeat puzzle types "
+        "when nothing fresh fits."
+    )
 
 if submitted:
     words = [w.strip() for w in clue_words.split(",") if w.strip()]
@@ -334,6 +354,7 @@ if submitted:
     st.session_state.quest_images = []
     st.session_state.quest_fingerprint = None
     st.session_state["repick_notice"] = {}
+    st.session_state["repick_pending"] = {}
     
 
 if st.session_state.eligibility_words:
@@ -437,15 +458,25 @@ if st.session_state.eligibility_words:
                                 images[idx] = None
                     st.session_state["quest_images"] = images
                     st.session_state.quest_fingerprint = fingerprint
+                pending_map = st.session_state.get("repick_pending", {})
+                if not isinstance(pending_map, dict):
+                    pending_map = {}
+                    st.session_state["repick_pending"] = pending_map
+                any_repick_pending = any(pending_map.values())
                 for i, (w, sel) in enumerate(zip(words, quest.picks)):
                     task = TASKS.get(sel.task_id)
                     if task is None:
                         st.error(f"Unknown task id: {sel.task_id!r}")
                         continue
+                    is_repick_pending = bool(pending_map.get(i, False))
                     # Reuse the already-generated image. Hint pills only change
                     # selection state, so encode() must NOT run again here.
-                    image = st.session_state.quest_images[i]
-                    if image is None:
+                    # While a replacement is in flight, keep showing the cached
+                    # old image and never re-encode it: imgs[i] is cleared only
+                    # after the new task_id is confirmed below.
+                    cached_images = st.session_state.get("quest_images", [])
+                    image = cached_images[i] if i < len(cached_images) else None
+                    if image is None and not is_repick_pending:
                         try:
                             encode = getattr(task, "encode", None)
                             if not callable(encode):
@@ -476,11 +507,14 @@ if st.session_state.eligibility_words:
                             )
                         img_col, hint_col = st.columns(2, vertical_alignment="center")
                         with img_col:
-                            st.image(image, alt=f"{task.name} task for {w}")  # type: ignore
+                            if image is not None:
+                                st.image(image, alt=f"{task.name} task for {w}")  # type: ignore
+                            else:
+                                st.caption("Loading replacement puzzle...")
                         with hint_col:
                             st.markdown(f":material/extension: **{task.name}**")
                             if sel.why:
-                                st.caption(sel.why)
+                                st.caption(f"AI reasoning: {sel.why}")
                             with st.expander("Need a nudge?"):
                                 st.markdown(
                                     "\n".join(f"- {h}" for h in task.hints)
@@ -492,21 +526,29 @@ if st.session_state.eligibility_words:
                                     index=2,
                                     key=f"repick_reason_{i}",
                                     horizontal=True,
+                                    disabled=is_repick_pending,
                                 )
                                 st.text_input(
                                     "What didn't work? (optional)",
                                     placeholder="e.g. too simple for a 12-year-old",
                                     max_chars=200,
                                     key=f"repick_note_{i}",
+                                    disabled=is_repick_pending,
                                 )
                                 notice = st.session_state.get("repick_notice", {}).get(i)
                                 if notice:
                                     st.caption(notice)
-                                if st.button(
-                                    "Get another puzzle",
+                                pressed = st.button(
+                                    "Finding another puzzle..."
+                                    if is_repick_pending
+                                    else "Get another puzzle",
                                     key=f"repick_btn_{i}",
                                     icon=":material/refresh:",
-                                ):
+                                    on_click=_request_repick,
+                                    args=(i,),
+                                    disabled=is_repick_pending or any_repick_pending,
+                                )
+                                if is_repick_pending or pressed:
                                     reason_val = st.session_state.get(
                                         f"repick_reason_{i}", "Different"
                                     )
@@ -609,12 +651,21 @@ if st.session_state.eligibility_words:
                                                         f"{new_task.name if new_task else new_id}"
                                                     )[:120]
                                                 else:
-                                                    st.error(
+                                                    new_why = (
                                                         "Could not find another puzzle: "
                                                         f"{type(e).__name__}: {e}"
                                                     )
                                     if new_id is None:
-                                        st.error("No alternative puzzle available for this word.")
+                                        notices = dict(
+                                            st.session_state.get("repick_notice", {})
+                                        )
+                                        notices[i] = (
+                                            new_why
+                                            or "No alternative puzzle available for this word."
+                                        )
+                                        st.session_state["repick_notice"] = notices
+                                        pending_map.pop(i, None)
+                                        st.rerun()
                                     else:
                                         quest.picks[i].task_id = new_id
                                         quest.picks[i].why = new_why
@@ -637,6 +688,7 @@ if st.session_state.eligibility_words:
                                         elif i in notices:
                                             notices.pop(i, None)
                                         st.session_state["repick_notice"] = notices
+                                        pending_map.pop(i, None)
                                         st.rerun()
                     if not is_last:
                         st.caption(
